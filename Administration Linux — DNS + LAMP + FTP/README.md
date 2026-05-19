@@ -6,6 +6,8 @@
 > Date : 19/05/2026
 
 ---
+## schéma de Projet
+![schéma de Projet](./screenshots/architecture_partie0_partie1%20(1).svg)
 
 ## Table des matières
 
