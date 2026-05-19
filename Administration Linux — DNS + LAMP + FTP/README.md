@@ -1,14 +1,22 @@
-# Administration Linux — DNS + LAMP + FTP
-## Hébergement de 2 sites web
+/# Administration Linux — Infrastructure Réseau & Hébergement Web
+## Projet Agri-Tech : DNS + LAMP + FTP + Routage + NAT
 
-> **ISGA Ingénierie** — Prof. Lahcen AITIBOUREK  
-> Étudiant : ________________________  
-> Date : ____________________________
+> **ISGA Marrakech — Niveau 2CI-ISI** — Prof. Lahcen AITIBOUREK  
+> Étudiant : Yassine Boucham  
+> Date : 19/05/2026
 
 ---
 
 ## Table des matières
 
+### 🔧 Partie 0 — Infrastructure Réseau (Pré-requis)
+- [Architecture réseau cible](#architecture-réseau-cible)
+- [Phase 1 — Identification des machines](#phase-1--identification-des-machines-hostnamectl)
+- [Phase 2 — Configuration réseau systemd-networkd](#phase-2--configuration-réseau-systemd-networkd)
+- [Phase 3 — Routage inter-VLAN et NAT nftables](#phase-3--routage-inter-vlan-et-nat-nftables)
+- [Phase 4 — Validation et tests](#phase-4--validation-et-tests-finaux)
+
+### 🌐 Partie 1 — Services Web (DNS + LAMP + FTP)
 1. [Introduction](#introduction)
 2. [Étape 1 — Préparation du serveur](#étape-1--préparation-du-serveur)
 3. [Étape 2 — DNS avec BIND9](#étape-2--installation-et-configuration-dns-bind9)
@@ -21,9 +29,247 @@
 
 ---
 
+
+
+# 🔧 Partie 0 — Infrastructure Réseau
+
+> ⚠️ **Cette partie doit être réalisée AVANT l'installation des services.**  
+> Elle configure le réseau de base (routage, NAT) sur lequel tout le reste repose.
+
+## Architecture réseau cible
+
+```
+                        INTERNET (WAN)
+                             │
+                    ┌────────▼────────┐
+                    │   srv-linux     │
+                    │  ens33: DHCP    │  ← NAT / Masquerade
+                    │  ens34: 10.10.10.254
+                    │  ens35: 20.20.20.254
+                    └──────┬──────┬───┘
+                           │      │
+               ┌───────────▼┐    ┌▼────────────┐
+               │  LAN Admin │    │   LAN IoT   │
+               │10.10.10.11 │    │ 20.20.20.22 │
+               │client-admin│    │ client-iot  │
+               └────────────┘    └─────────────┘
+```
+
+| Machine       | Interface | Adresse IP       | Rôle              |
+|---------------|-----------|------------------|-------------------|
+| srv-linux     | ens33     | DHCP (NAT WAN)   | Routeur / Serveur |
+| srv-linux     | ens34     | 10.10.10.254/24  | Gateway LAN Admin |
+| srv-linux     | ens35     | 20.20.20.254/24  | Gateway LAN IoT   |
+| client-admin  | ens33     | 10.10.10.11/24   | Client Admin      |
+| client-iot    | ens33     | 20.20.20.22/24   | Client IoT        |
+
+---
+
+## Phase 1 — Identification des machines (hostnamectl)
+
+> 💡 **Pourquoi hostnamectl ?** Contrairement à modifier `/etc/hostname` manuellement, `hostnamectl` applique le changement immédiatement sans redémarrage, met à jour le nom dans systemd, et garantit la cohérence de tout l'environnement système.
+
+### Sur srv-linux (routeur)
+
+```bash
+hostnamectl set-hostname srv-linux
+sudo nano /etc/hosts
+```
+
+Dans `/etc/hosts`, modifier la ligne `127.0.1.1` :
+
+```
+127.0.1.1   srv-linux
+```
+
+### Sur client-admin
+
+```bash
+hostnamectl set-hostname client-admin
+sudo nano /etc/hosts
+# Modifier : 127.0.1.1   client-admin
+```
+
+### Sur client-iot
+
+```bash
+hostnamectl set-hostname client-iot
+sudo nano /etc/hosts
+# Modifier : 127.0.1.1   client-iot
+```
+
+Vérifier sur chaque machine :
+
+```bash
+hostnamectl status
+```
+
+> 📸 **Preuve N°1** — Sur `client-iot`, résultat de `hostnamectl status`  
+> `[ Insérez votre capture d'écran ici ]`
+
+---
+
+## Phase 2 — Configuration réseau (systemd-networkd)
+
+> 💡 **ifupdown vs systemd-networkd** : `ifupdown` est l'ancien système de configuration réseau Debian, basé sur des scripts shell et le fichier `/etc/network/interfaces`. Il est statique et nécessite des redémarrages. `systemd-networkd` est le système moderne intégré à systemd : il gère la configuration de façon déclarative (fichiers `.network`), réagit dynamiquement aux changements matériels, et s'intègre nativement avec `resolved` pour le DNS. C'est le standard Debian 13.
+
+### Nettoyage préalable (sur les 3 machines)
+
+```bash
+systemctl stop networking
+systemctl disable networking
+mv /etc/network/interfaces /etc/network/interfaces.backup
+systemctl enable systemd-networkd
+systemctl start systemd-networkd
+```
+
+### Configuration du routeur srv-linux
+
+Créer les 3 fichiers dans `/etc/systemd/network/` :
+
+**Fichier `10-wan.network`** (Interface WAN vers Internet) :
+
+```ini
+[Match]
+Name=ens33
+
+[Network]
+DHCP=ipv4
+```
+
+**Fichier `20-lan-admin.network`** (LAN Admin) :
+
+```ini
+[Match]
+Name=ens34
+
+[Network]
+Address=10.10.10.254/24
+IPForward=ipv4
+```
+
+**Fichier `30-lan-iot.network`** (LAN IoT) :
+
+```ini
+[Match]
+Name=ens35
+
+[Network]
+Address=20.20.20.254/24
+IPForward=ipv4
+```
+
+> 💡 **IPForward=ipv4** remplace la commande `sysctl -w net.ipv4.ip_forward=1`. Le forwarding est activé directement dans la configuration systemd-networkd, de façon persistante et sans modifier `/etc/sysctl.conf`.
+
+```bash
+systemctl restart systemd-networkd
+networkctl status
+```
+
+> 📸 **Preuve N°2** — `networkctl status` sur srv-linux montrant les 3 interfaces "configured"  
+> `[ Insérez votre capture d'écran ici ]`
+
+### Configuration de client-admin
+
+Créer `/etc/systemd/network/10-lan.network` :
+
+```ini
+[Match]
+Name=ens33
+
+[Network]
+Address=10.10.10.11/24
+Gateway=10.10.10.254
+DNS=8.8.8.8
+```
+
+```bash
+systemctl restart systemd-networkd
+```
+
+### Configuration de client-iot
+
+Créer `/etc/systemd/network/10-lan.network` :
+
+```ini
+[Match]
+Name=ens33
+
+[Network]
+Address=20.20.20.22/24
+Gateway=20.20.20.254
+DNS=8.8.8.8
+```
+
+```bash
+systemctl restart systemd-networkd
+```
+
+> 📸 **Preuve N°3** — Sur `client-admin`, résultat de `networkctl status ens33` (IP + Gateway visibles)  
+> `[ Insérez votre capture d'écran ici ]`
+
+---
+
+## Phase 3 — Routage inter-VLAN et NAT (nftables)
+
+> 💡 `nftables` est le successeur de `iptables` sur Debian 13. Il unifie la gestion des règles IPv4/IPv6 dans un seul framework plus lisible et plus performant.
+
+Sur **srv-linux** :
+
+```bash
+# 1. Créer la table NAT pour IPv4
+nft add table ip nat
+
+# 2. Créer la chaîne postrouting
+nft add chain ip nat postrouting \{ type nat hook postrouting priority 100 \; \}
+
+# 3. Ajouter la règle Masquerade sur l'interface WAN
+nft add rule ip nat postrouting oifname "ens33" masquerade
+
+# 4. Vérifier la configuration
+nft list table ip nat
+```
+
+Résultat attendu :
+
+```
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "ens33" masquerade
+    }
+}
+```
+
+> 📸 **Preuve N°4** — Résultat de `nft list table ip nat` avec la règle masquerade  
+> `[ Insérez votre capture d'écran ici ]`
+
+---
+
+## Phase 4 — Validation et tests finaux
+
+Depuis **client-admin**, tester l'architecture complète :
+
+```bash
+# Test 1 : Routage inter-VLAN (client-admin → client-iot)
+ping -c 2 20.20.20.22
+
+# Test 2 : NAT et résolution DNS (accès Internet)
+ping -c 2 google.com
+```
+
+> 📸 **Preuve N°5** — Les 2 pings réussis depuis `client-admin` (inter-VLAN + Internet)  
+> `[ Insérez votre capture d'écran ici ]`
+
+---
+
+---
+
+# 🌐 Partie 1 — Services Web (DNS + LAMP + FTP)
+
 ## Introduction
 
-Ce projet consiste à configurer un serveur Linux complet avec les services suivants :
+Une fois l'infrastructure réseau de la Partie 0 opérationnelle, cette partie installe et configure les services web sur **srv-linux** :
 
 - **DNS (BIND9)** — résolution de noms pour 2 domaines
 - **LAMP** — serveur web Apache + MySQL + PHP
@@ -31,7 +277,8 @@ Ce projet consiste à configurer un serveur Linux complet avec les services suiv
 - **WordPress** sur `nom.blog`
 - **Drupal** sur `prenom.site`
 
-> 💡 Environnement : Debian / Ubuntu Server — VMware — Prof. Lahcen AITIBOUREK
+> 💡 Environnement : Debian 13 / Ubuntu Server — VMware — Prof. Lahcen AITIBOUREK  
+> 🔗 Toutes les commandes sont exécutées sur **srv-linux** (10.10.10.254 / 20.20.20.254)
 
 ---
 
@@ -456,12 +703,18 @@ curl http://prenom.site
 
 ## Conclusion
 
-Ce projet a permis de mettre en place une infrastructure complète d'hébergement web sur Linux. Les compétences acquises comprennent :
+Ce projet a permis de mettre en place une infrastructure complète réseau et hébergement web sur Linux. Les compétences acquises comprennent :
 
+**Infrastructure réseau (Partie 0) :**
+- Identification des machines avec `hostnamectl`
+- Configuration réseau moderne avec `systemd-networkd`
+- Routage inter-VLAN et NAT avec `nftables`
+
+**Services web (Partie 1) :**
 - Configuration d'un serveur DNS avec BIND9 (zones directe et inverse)
 - Installation et configuration de la pile LAMP (Apache, MySQL, PHP)
 - Déploiement de sites WordPress et Drupal avec Virtual Hosts Apache
 - Configuration du service FTP avec vsftpd pour le transfert de fichiers
 - Utilisation de FileZilla depuis Windows pour interagir avec le serveur Linux
 
-> ⚠️ Toutes les captures d'écran doivent être insérées aux emplacements prévus avant la remise du rapport.
+> ⚠️ Toutes les captures d'écran (Preuves N°1 à 5 + Captures 1 à 28) doivent être insérées aux emplacements prévus avant la remise du rapport.
