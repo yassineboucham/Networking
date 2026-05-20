@@ -6,6 +6,7 @@
 > Date : 19/05/2026
 
 ---
+![Carte_reseau](./screenshots/Carte_reseau.PNG)
 ## redémarrer la carte réseau ens33
 - Méthode 1 : avec ip (simple)
 ```
@@ -26,6 +27,7 @@ sudo systemctl restart networking
 ```
 sudo systemctl restart systemd-networkd
 ```
+
 ## schéma de Projet
 ![schéma de Projet](./screenshots/architecture_partie0_partie1%20(1).svg)
 
