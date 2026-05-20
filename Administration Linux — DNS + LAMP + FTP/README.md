@@ -6,8 +6,12 @@
 > Date : 19/05/2026
 
 ---
-![Carte_reseau](./screenshots/Carte_reseau.PNG)
 ## redémarrer la carte réseau ens33
+- Reseau virtue
+![reseau_virtuel](./screenshots/reseau_virtuel.PNG)
+- Carte_reseau
+![Carte_reseau](./screenshots/Carte_reseau.PNG)
+
 - Méthode 1 : avec ip (simple)
 ```
 sudo ip link set ens33 down
