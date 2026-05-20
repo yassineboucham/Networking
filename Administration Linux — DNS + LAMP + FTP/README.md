@@ -7,9 +7,9 @@
 
 ---
 ## redémarrer la carte réseau ens33
-- Reseau virtue
+Reseau virtue
 ![reseau_virtuel](./screenshots/reseau_virtuel.PNG)
-- Carte_reseau
+Carte_reseau
 ![Carte_reseau](./screenshots/Carte_reseau.PNG)
 
 - Méthode 1 : avec ip (simple)
