@@ -6,6 +6,26 @@
 > Date : 19/05/2026
 
 ---
+## redémarrer la carte réseau ens33
+- Méthode 1 : avec ip (simple)
+```
+sudo ip link set ens33 down
+sudo ip link set ens33 up
+```
+- Méthode 2 : avec ifdown et ifup
+```
+sudo ifdown ens33
+sudo ifup ens33
+```
+- Méthode 3 : redémarrer tout le service réseau
+> Sur Debian classique :
+```
+sudo systemctl restart networking
+```
+> Si tu utilises systemd-networkd :
+```
+sudo systemctl restart systemd-networkd
+```
 ## schéma de Projet
 ![schéma de Projet](./screenshots/architecture_partie0_partie1%20(1).svg)
 
