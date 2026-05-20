@@ -1,70 +1,70 @@
-/# Administration Linux — Infrastructure Réseau & Hébergement Web
-## Projet Agri-Tech : DNS + LAMP + FTP + Routage + NAT
+# Linux Administration — Network Infrastructure & Web Hosting
+## Agri-Tech Project: DNS + LAMP + FTP + Routing + NAT
 
-> **ISGA Marrakech — Niveau 2CI-ISI** — Prof. Lahcen AITIBOUREK  
-> Étudiant : Yassine Boucham  
-> Date : 19/05/2026
+> **ISGA Marrakech — Level 2CI-ISI** — Prof. Lahcen AITIBOUREK
+> Student: Yassine Boucham
+> Date: 19/05/2026
 
 ---
-## redémarrer la carte réseau ens33
-Reseau virtue
+## Restart the ens33 network interface
+Virtual network
 ![reseau_virtuel](./screenshots/reseau_virtuel.PNG)
-Carte_reseau
+Network adapter
 ![Carte_reseau](./screenshots/Carte_reseau.PNG)
 
-- Méthode 1 : avec ip (simple)
+- Method 1: using ip (simple)
 ```
 sudo ip link set ens33 down
 sudo ip link set ens33 up
 ```
-- Méthode 2 : avec ifdown et ifup
+- Method 2: using ifdown and ifup
 ```
 sudo ifdown ens33
 sudo ifup ens33
 ```
-- Méthode 3 : redémarrer tout le service réseau
-> Sur Debian classique :
+- Method 3: restart the entire network service
+> On classic Debian:
 ```
 sudo systemctl restart networking
 ```
-> Si tu utilises systemd-networkd :
+> If using systemd-networkd:
 ```
 sudo systemctl restart systemd-networkd
 ```
 
-## schéma de Projet
-![schéma de Projet](./screenshots/architecture_partie0_partie1%20(1).svg)
+## Project Diagram
+![Project Diagram](./screenshots/architecture_partie0_partie1%20(1).svg)
 
-## Table des matières
+## Table of Contents
 
-### 🔧 Partie 0 — Infrastructure Réseau (Pré-requis)
-- [Architecture réseau cible](#architecture-réseau-cible)
-- [Phase 1 — Identification des machines](#phase-1--identification-des-machines-hostnamectl)
-- [Phase 2 — Configuration réseau systemd-networkd](#phase-2--configuration-réseau-systemd-networkd)
-- [Phase 3 — Routage inter-VLAN et NAT nftables](#phase-3--routage-inter-vlan-et-nat-nftables)
-- [Phase 4 — Validation et tests](#phase-4--validation-et-tests-finaux)
+### 🔧 Part 0 — Network Infrastructure (Prerequisites)
+- [Target network architecture](#target-network-architecture)
+- [Phase 1 — Machine identification](#phase-1--machine-identification-hostnamectl)
+- [Phase 2 — systemd-networkd network configuration](#phase-2--systemd-networkd-network-configuration)
+- [Phase 3 — Inter-VLAN routing and NAT nftables](#phase-3--inter-vlan-routing-and-nat-nftables)
+- [Phase 4 — Validation and final tests](#phase-4--validation-and-final-tests)
 
-### 🌐 Partie 1 — Services Web (DNS + LAMP + FTP)
+### 🌐 Part 1 — Web Services (DNS + LAMP + FTP)
 1. [Introduction](#introduction)
-2. [Étape 1 — Préparation du serveur](#étape-1--préparation-du-serveur)
-3. [Étape 2 — DNS avec BIND9](#étape-2--installation-et-configuration-dns-bind9)
-4. [Étape 3 — Installation LAMP](#étape-3--installation-lamp)
-5. [Étape 4 — Installation FTP (vsftpd)](#étape-4--installation-ftp-vsftpd)
-6. [Étape 5 — Déploiement WordPress (nom.blog)](#étape-5--déploiement-wordpress-nomblog)
-7. [Étape 6 — Déploiement Drupal (prenom.site)](#étape-6--déploiement-drupal-prenomsite)
-8. [Vérification finale](#vérification-finale)
+2. [Step 1 — Server preparation](#step-1--server-preparation)
+3. [Step 2 — DNS with BIND9](#step-2--dns-installation-and-configuration-bind9)
+4. [Step 3 — LAMP installation](#step-3--lamp-installation)
+5. [Step 4 — FTP installation (vsftpd)](#step-4--ftp-installation-vsftpd)
+6. [Step 5 — WordPress deployment (name.blog)](#step-5--wordpress-deployment-nameblog)
+7. [Step 6 — Drupal deployment (firstname.site)](#step-6--drupal-deployment-firstnamesite)
+8. [Final verification](#final-verification)
 9. [Conclusion](#conclusion)
 
 ---
 
 
 
-# 🔧 Partie 0 — Infrastructure Réseau
+# 🔧 Part 0 — Network Infrastructure
 
-> ⚠️ **Cette partie doit être réalisée AVANT l'installation des services.**  
-> Elle configure le réseau de base (routage, NAT) sur lequel tout le reste repose.
+> ⚠️ **This part must be completed BEFORE installing any services.**
+> It configures the base network (routing, NAT) on which everything else relies.
 
-## Architecture réseau cible
+## Target Network Architecture
 
 ```
                         INTERNET (WAN)
@@ -77,71 +77,71 @@ sudo systemctl restart systemd-networkd
                     └──────┬──────┬───┘
                            │      │
                ┌───────────▼┐    ┌▼────────────┐
-               │  LAN Admin │    │   LAN IoT   │
+               │  Admin LAN │    │   IoT LAN   │
                │10.10.10.11 │    │ 20.20.20.22 │
                │client-admin│    │ client-iot  │
                └────────────┘    └─────────────┘
 ```
 
-| Machine       | Interface | Adresse IP       | Rôle              |
+| Machine       | Interface | IP Address       | Role              |
 |---------------|-----------|------------------|-------------------|
-| srv-linux     | ens33     | DHCP (NAT WAN)   | Routeur / Serveur |
-| srv-linux     | ens34     | 10.10.10.254/24  | Gateway LAN Admin |
-| srv-linux     | ens35     | 20.20.20.254/24  | Gateway LAN IoT   |
-| client-admin  | ens33     | 10.10.10.11/24   | Client Admin      |
-| client-iot    | ens33     | 20.20.20.22/24   | Client IoT        |
+| srv-linux     | ens33     | DHCP (NAT WAN)   | Router / Server   |
+| srv-linux     | ens34     | 10.10.10.254/24  | Admin LAN Gateway |
+| srv-linux     | ens35     | 20.20.20.254/24  | IoT LAN Gateway   |
+| client-admin  | ens33     | 10.10.10.11/24   | Admin Client      |
+| client-iot    | ens33     | 20.20.20.22/24   | IoT Client        |
 
 ---
 
-## Phase 1 — Identification des machines (hostnamectl)
+## Phase 1 — Machine Identification (hostnamectl)
 
-> 💡 **Pourquoi hostnamectl ?** Contrairement à modifier `/etc/hostname` manuellement, `hostnamectl` applique le changement immédiatement sans redémarrage, met à jour le nom dans systemd, et garantit la cohérence de tout l'environnement système.
+> 💡 **Why hostnamectl?** Unlike editing `/etc/hostname` manually, `hostnamectl` applies the change immediately without a reboot, updates the name in systemd, and ensures consistency across the entire system environment.
 
-### Sur srv-linux (routeur)
+### On srv-linux (router)
 
 ```bash
 hostnamectl set-hostname srv-linux
 sudo nano /etc/hosts
 ```
 
-Dans `/etc/hosts`, modifier la ligne `127.0.1.1` :
+In `/etc/hosts`, modify the `127.0.1.1` line:
 
 ```
 127.0.1.1   srv-linux
 ```
 
-### Sur client-admin
+### On client-admin
 
 ```bash
 hostnamectl set-hostname client-admin
 sudo nano /etc/hosts
-# Modifier : 127.0.1.1   client-admin
+# Modify: 127.0.1.1   client-admin
 ```
 
-### Sur client-iot
+### On client-iot
 
 ```bash
 hostnamectl set-hostname client-iot
 sudo nano /etc/hosts
-# Modifier : 127.0.1.1   client-iot
+# Modify: 127.0.1.1   client-iot
 ```
 
-Vérifier sur chaque machine :
+Verify on each machine:
 
 ```bash
 hostnamectl status
 ```
 
-> 📸 **Preuve N°1** — Sur `client-iot`, résultat de `hostnamectl status`  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Proof #1** — On `client-iot`, output of `hostnamectl status`
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Phase 2 — Configuration réseau (systemd-networkd)
+## Phase 2 — Network Configuration (systemd-networkd)
 
-> 💡 **ifupdown vs systemd-networkd** : `ifupdown` est l'ancien système de configuration réseau Debian, basé sur des scripts shell et le fichier `/etc/network/interfaces`. Il est statique et nécessite des redémarrages. `systemd-networkd` est le système moderne intégré à systemd : il gère la configuration de façon déclarative (fichiers `.network`), réagit dynamiquement aux changements matériels, et s'intègre nativement avec `resolved` pour le DNS. C'est le standard Debian 13.
+> 💡 **ifupdown vs systemd-networkd**: `ifupdown` is the old Debian network configuration system, based on shell scripts and the `/etc/network/interfaces` file. It is static and requires restarts. `systemd-networkd` is the modern system integrated into systemd: it manages configuration declaratively (`.network` files), responds dynamically to hardware changes, and integrates natively with `resolved` for DNS. It is the Debian 13 standard.
 
-### Nettoyage préalable (sur les 3 machines)
+### Initial cleanup (on all 3 machines)
 
 ```bash
 systemctl stop networking
@@ -174,11 +174,11 @@ systemctl start systemd-networkd
 * disabled → not enabled
 * masked → blocked from starting
 
-### Configuration du routeur srv-linux
+### srv-linux router configuration
 
-Créer les 3 fichiers dans `/etc/systemd/network/` :
+Create the 3 files in `/etc/systemd/network/`:
 
-**Fichier `10-wan.network`** (Interface WAN vers Internet) :
+**File `10-wan.network`** (WAN interface toward the Internet):
 
 ```ini
 [Match]
@@ -188,7 +188,7 @@ Name=ens33
 DHCP=ipv4
 ```
 
-**Fichier `20-lan-admin.network`** (LAN Admin) :
+**File `20-lan-admin.network`** (Admin LAN):
 
 ```ini
 [Match]
@@ -199,7 +199,7 @@ Address=10.10.10.254/24
 IPForward=ipv4
 ```
 
-**Fichier `30-lan-iot.network`** (LAN IoT) :
+**File `30-lan-iot.network`** (IoT LAN):
 
 ```ini
 [Match]
@@ -210,19 +210,19 @@ Address=20.20.20.254/24
 IPForward=ipv4
 ```
 
-> 💡 **IPForward=ipv4** remplace la commande `sysctl -w net.ipv4.ip_forward=1`. Le forwarding est activé directement dans la configuration systemd-networkd, de façon persistante et sans modifier `/etc/sysctl.conf`.
+> 💡 **IPForward=ipv4** replaces the command `sysctl -w net.ipv4.ip_forward=1`. Forwarding is enabled directly in the systemd-networkd configuration, persistently and without editing `/etc/sysctl.conf`.
 
 ```bash
 systemctl restart systemd-networkd
 networkctl status
 ```
 
-> 📸 **Preuve N°2** — `networkctl status` sur srv-linux montrant les 3 interfaces "configured"  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Proof #2** — `networkctl status` on srv-linux showing all 3 interfaces as "configured"
+> `[ Insert your screenshot here ]`
 
-### Configuration de client-admin
+### client-admin configuration
 
-Créer `/etc/systemd/network/10-lan.network` :
+Create `/etc/systemd/network/10-lan.network`:
 
 ```ini
 [Match]
@@ -238,9 +238,9 @@ DNS=8.8.8.8
 systemctl restart systemd-networkd
 ```
 
-### Configuration de client-iot
+### client-iot configuration
 
-Créer `/etc/systemd/network/10-lan.network` :
+Create `/etc/systemd/network/10-lan.network`:
 
 ```ini
 [Match]
@@ -256,32 +256,32 @@ DNS=8.8.8.8
 systemctl restart systemd-networkd
 ```
 
-> 📸 **Preuve N°3** — Sur `client-admin`, résultat de `networkctl status ens33` (IP + Gateway visibles)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Proof #3** — On `client-admin`, output of `networkctl status ens33` (IP + Gateway visible)
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Phase 3 — Routage inter-VLAN et NAT (nftables)
+## Phase 3 — Inter-VLAN Routing and NAT (nftables)
 
-> 💡 `nftables` est le successeur de `iptables` sur Debian 13. Il unifie la gestion des règles IPv4/IPv6 dans un seul framework plus lisible et plus performant.
+> 💡 `nftables` is the successor to `iptables` on Debian 13. It unifies IPv4/IPv6 rule management in a single, more readable and more performant framework.
 
-Sur **srv-linux** :
+On **srv-linux**:
 
 ```bash
-# 1. Créer la table NAT pour IPv4
+# 1. Create the NAT table for IPv4
 nft add table ip nat
 
-# 2. Créer la chaîne postrouting
+# 2. Create the postrouting chain
 nft add chain ip nat postrouting \{ type nat hook postrouting priority 100 \; \}
 
-# 3. Ajouter la règle Masquerade sur l'interface WAN
+# 3. Add the Masquerade rule on the WAN interface
 nft add rule ip nat postrouting oifname "ens33" masquerade
 
-# 4. Vérifier la configuration
+# 4. Verify the configuration
 nft list table ip nat
 ```
 
-Résultat attendu :
+Expected output:
 
 ```
 table ip nat {
@@ -292,122 +292,122 @@ table ip nat {
 }
 ```
 
-> 📸 **Preuve N°4** — Résultat de `nft list table ip nat` avec la règle masquerade  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Proof #4** — Output of `nft list table ip nat` with the masquerade rule
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Phase 4 — Validation et tests finaux
+## Phase 4 — Validation and Final Tests
 
-Depuis **client-admin**, tester l'architecture complète :
+From **client-admin**, test the complete architecture:
 
 ```bash
-# Test 1 : Routage inter-VLAN (client-admin → client-iot)
+# Test 1: Inter-VLAN routing (client-admin → client-iot)
 ping -c 2 20.20.20.22
 
-# Test 2 : NAT et résolution DNS (accès Internet)
+# Test 2: NAT and DNS resolution (Internet access)
 ping -c 2 google.com
 ```
 
-> 📸 **Preuve N°5** — Les 2 pings réussis depuis `client-admin` (inter-VLAN + Internet)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Proof #5** — Both pings successful from `client-admin` (inter-VLAN + Internet)
+> `[ Insert your screenshot here ]`
 
 ---
 
 ---
 
-# 🌐 Partie 1 — Services Web (DNS + LAMP + FTP)
+# 🌐 Part 1 — Web Services (DNS + LAMP + FTP)
 
 ## Introduction
 
-Une fois l'infrastructure réseau de la Partie 0 opérationnelle, cette partie installe et configure les services web sur **srv-linux** :
+Once the network infrastructure from Part 0 is operational, this part installs and configures web services on **srv-linux**:
 
-- **DNS (BIND9)** — résolution de noms pour 2 domaines
-- **LAMP** — serveur web Apache + MySQL + PHP
-- **FTP (vsftpd)** — transfert de fichiers depuis Windows
-- **WordPress** sur `nom.blog`
-- **Drupal** sur `prenom.site`
+- **DNS (BIND9)** — name resolution for 2 domains
+- **LAMP** — Apache web server + MySQL + PHP
+- **FTP (vsftpd)** — file transfer from Windows
+- **WordPress** on `name.blog`
+- **Drupal** on `firstname.site`
 
-> 💡 Environnement : Debian 13 / Ubuntu Server — VMware — Prof. Lahcen AITIBOUREK  
-> 🔗 Toutes les commandes sont exécutées sur **srv-linux** (10.10.10.254 / 20.20.20.254)
+> 💡 Environment: Debian 13 / Ubuntu Server — VMware — Prof. Lahcen AITIBOUREK
+> 🔗 All commands are executed on **srv-linux** (10.10.10.254 / 20.20.20.254)
 
 ---
 
-## Étape 1 — Préparation du serveur
+## Step 1 — Server Preparation
 
-### 1.1 Mise à jour du système
+### 1.1 System update
 
-Avant toute installation, mettre à jour les paquets :
+Before any installation, update the packages:
 
 ```bash
 sudo apt update
 sudo apt upgrade -y
 ```
 
-> 📸 **Capture 1** — Résultat de `apt update` / `apt upgrade`  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 1** — Output of `apt update` / `apt upgrade`
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 1.2 Configuration du nom d'hôte
+### 1.2 Hostname configuration
 
-Définir le nom du serveur avec `hostnamectl` :
+Set the server name with `hostnamectl`:
 
 ```bash
 sudo hostnamectl set-hostname srv-linux
 hostnamectl
 ```
 
-> 📸 **Capture 2** — Résultat de la commande `hostnamectl`  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 2** — Output of the `hostnamectl` command
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 1.3 Configuration réseau (systemd-networkd)
+### 1.3 Network configuration (systemd-networkd)
 
-Configurer les interfaces réseau dans `/etc/netplan/` ou via `systemd-networkd` selon votre environnement. Vérifier l'adresse IP :
+Configure network interfaces in `/etc/netplan/` or via `systemd-networkd` depending on your environment. Verify the IP address:
 
 ```bash
 ip addr show
 ```
 
-> 📸 **Capture 3** — Résultat de `ip addr show` (interfaces et adresses IP)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 3** — Output of `ip addr show` (interfaces and IP addresses)
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Étape 2 — Installation et configuration DNS (BIND9)
+## Step 2 — DNS Installation and Configuration (BIND9)
 
-### 2.1 Installation de BIND9
+### 2.1 BIND9 installation
 
 ```bash
 sudo apt install bind9 bind9utils bind9-doc -y
 sudo systemctl status bind9
 ```
 
-> 📸 **Capture 4** — BIND9 installé et service actif (status vert)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 4** — BIND9 installed and service active (green status)
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 2.2 Zone directe — nom.blog
+### 2.2 Forward zone — name.blog
 
-Déclarer la zone dans `/etc/bind/named.conf.local` :
+Declare the zone in `/etc/bind/named.conf.local`:
 
 ```
-zone "nom.blog" {
+zone "name.blog" {
     type master;
-    file "/etc/bind/db.nom.blog";
+    file "/etc/bind/db.name.blog";
 };
 ```
 
-Créer le fichier de zone `/etc/bind/db.nom.blog` :
+Create the zone file `/etc/bind/db.name.blog`:
 
 ```
 $TTL 604800
-@   IN  SOA  srv-linux.nom.blog. admin.nom.blog. (
+@   IN  SOA  srv-linux.name.blog. admin.name.blog. (
               2024010101 604800 86400 2419200 604800 )
-@       IN  NS   srv-linux.nom.blog.
+@       IN  NS   srv-linux.name.blog.
 srv-linux IN A   192.168.1.10
 @       IN  A    192.168.1.10
 www     IN  CNAME @
@@ -415,23 +415,23 @@ ftp     IN  CNAME @
 mail    IN  CNAME @
 ```
 
-> 📸 **Capture 5** — Contenu du fichier `db.nom.blog`  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 5** — Contents of the `db.name.blog` file
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 2.3 Zone directe — prenom.site
+### 2.3 Forward zone — firstname.site
 
-Répéter la même opération pour `prenom.site` (Drupal) dans `named.conf.local` et créer `db.prenom.site` avec la même structure.
+Repeat the same operation for `firstname.site` (Drupal) in `named.conf.local` and create `db.firstname.site` with the same structure.
 
-> 📸 **Capture 6** — Contenu du fichier `db.prenom.site`  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 6** — Contents of the `db.firstname.site` file
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 2.4 Zone inverse (PTR)
+### 2.4 Reverse zone (PTR)
 
-Déclarer la zone inverse dans `named.conf.local` :
+Declare the reverse zone in `named.conf.local`:
 
 ```
 zone "1.168.192.in-addr.arpa" {
@@ -440,49 +440,49 @@ zone "1.168.192.in-addr.arpa" {
 };
 ```
 
-Fichier `/etc/bind/db.192` :
+File `/etc/bind/db.192`:
 
 ```
 $TTL 604800
-@   IN  SOA  srv-linux.nom.blog. admin.nom.blog. (
+@   IN  SOA  srv-linux.name.blog. admin.name.blog. (
               2024010101 604800 86400 2419200 604800 )
-@   IN  NS   srv-linux.nom.blog.
-10  IN  PTR  srv-linux.nom.blog.
+@   IN  NS   srv-linux.name.blog.
+10  IN  PTR  srv-linux.name.blog.
 ```
 
-> 📸 **Capture 7** — Contenu du fichier `db.192` (zone inverse)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 7** — Contents of the `db.192` file (reverse zone)
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 2.5 Vérification et redémarrage BIND9
+### 2.5 BIND9 verification and restart
 
 ```bash
 sudo named-checkconf
-sudo named-checkzone nom.blog /etc/bind/db.nom.blog
-sudo named-checkzone prenom.site /etc/bind/db.prenom.site
+sudo named-checkzone name.blog /etc/bind/db.name.blog
+sudo named-checkzone firstname.site /etc/bind/db.firstname.site
 sudo systemctl restart bind9
 ```
 
-> 📸 **Capture 8** — `named-checkconf` et `named-checkzone` sans erreur  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 8** — `named-checkconf` and `named-checkzone` with no errors
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 2.6 Test de résolution DNS
+### 2.6 DNS resolution test
 
 ```bash
-nslookup nom.blog 127.0.0.1
-nslookup www.nom.blog 127.0.0.1
-nslookup ftp.nom.blog 127.0.0.1
+nslookup name.blog 127.0.0.1
+nslookup www.name.blog 127.0.0.1
+nslookup ftp.name.blog 127.0.0.1
 ```
 
-> 📸 **Capture 9** — Résultats `nslookup` pour `nom.blog` et `prenom.site`  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 9** — `nslookup` results for `name.blog` and `firstname.site`
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Étape 3 — Installation LAMP
+## Step 3 — LAMP Installation
 
 ### 3.1 Apache2
 
@@ -492,8 +492,8 @@ sudo systemctl enable apache2
 sudo systemctl status apache2
 ```
 
-> 📸 **Capture 10** — Apache2 actif (status vert)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 10** — Apache2 active (green status)
+> `[ Insert your screenshot here ]`
 
 ---
 
@@ -504,28 +504,28 @@ sudo apt install mysql-server -y
 sudo mysql_secure_installation
 ```
 
-> 📸 **Capture 11** — `mysql_secure_installation` terminé  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 11** — `mysql_secure_installation` completed
+> `[ Insert your screenshot here ]`
 
-Créer les bases de données pour WordPress et Drupal :
+Create the databases for WordPress and Drupal:
 
 ```sql
 sudo mysql -u root -p
 
 CREATE DATABASE wordpress_db;
-CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'motdepasse';
+CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password';
 GRANT ALL PRIVILEGES ON wordpress_db.* TO 'wp_user'@'localhost';
 
 CREATE DATABASE drupal_db;
-CREATE USER 'drupal_user'@'localhost' IDENTIFIED BY 'motdepasse2';
+CREATE USER 'drupal_user'@'localhost' IDENTIFIED BY 'password2';
 GRANT ALL PRIVILEGES ON drupal_db.* TO 'drupal_user'@'localhost';
 
 FLUSH PRIVILEGES;
 EXIT;
 ```
 
-> 📸 **Capture 12** — Création des bases de données WordPress et Drupal  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 12** — WordPress and Drupal databases created
+> `[ Insert your screenshot here ]`
 
 ---
 
@@ -537,25 +537,25 @@ sudo apt install php-curl php-gd php-mbstring php-xml php-zip php-intl -y
 php -v
 ```
 
-> 📸 **Capture 13** — Version PHP affichée (`php -v`)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 13** — PHP version displayed (`php -v`)
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 3.4 Test PHP
+### 3.4 PHP test
 
 ```bash
 echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/info.php
-# Ouvrir http://192.168.1.10/info.php dans le navigateur
+# Open http://192.168.1.10/info.php in the browser
 sudo rm /var/www/html/info.php
 ```
 
-> 📸 **Capture 14** — Page `phpinfo()` visible dans le navigateur  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 14** — `phpinfo()` page visible in the browser
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Étape 4 — Installation FTP (vsftpd)
+## Step 4 — FTP Installation (vsftpd)
 
 ### 4.1 Installation
 
@@ -564,20 +564,20 @@ sudo apt install vsftpd -y
 sudo systemctl status vsftpd
 ```
 
-> 📸 **Capture 15** — vsftpd installé et actif  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 15** — vsftpd installed and active
+> `[ Insert your screenshot here ]`
 
 ---
 
 ### 4.2 Configuration /etc/vsftpd.conf
 
-Modifier le fichier de configuration pour activer l'écriture :
+Edit the configuration file to enable writing:
 
 ```bash
 sudo nano /etc/vsftpd.conf
 ```
 
-Lignes à modifier :
+Lines to modify:
 
 ```
 write_enable=YES
@@ -590,30 +590,30 @@ allow_writeable_chroot=YES
 sudo systemctl restart vsftpd
 ```
 
-> 📸 **Capture 16** — Fichier `vsftpd.conf` avec les options modifiées  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 16** — `vsftpd.conf` file with modified options
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 4.3 Connexion depuis Windows avec FileZilla
+### 4.3 Connection from Windows with FileZilla
 
-| Paramètre  | Valeur              |
+| Parameter  | Value               |
 |------------|---------------------|
-| Hôte       | `192.168.1.10`      |
+| Host       | `192.168.1.10`      |
 | Port       | `21`                |
-| Protocole  | FTP                 |
-| Utilisateur| votre_user_linux    |
+| Protocol   | FTP                 |
+| Username   | your_linux_user     |
 
-Transférer le fichier `wordpress.zip` vers `/var/www/html/` sur le serveur.
+Transfer the `wordpress.zip` file to `/var/www/html/` on the server.
 
-> 📸 **Capture 17** — FileZilla connecté, transfert de `wordpress.zip` en cours  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 17** — FileZilla connected, transferring `wordpress.zip`
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Étape 5 — Déploiement WordPress (nom.blog)
+## Step 5 — WordPress Deployment (name.blog)
 
-### 5.1 Décompresser WordPress
+### 5.1 Extract WordPress
 
 ```bash
 cd /var/www/html
@@ -622,19 +622,19 @@ sudo chown -R www-data:www-data wordpress/
 sudo chmod -R 755 wordpress/
 ```
 
-> 📸 **Capture 18** — Décompression de `wordpress.zip` réussie  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 18** — `wordpress.zip` extracted successfully
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 5.2 Virtual Host Apache pour nom.blog
+### 5.2 Apache Virtual Host for name.blog
 
-Créer `/etc/apache2/sites-available/nom.blog.conf` :
+Create `/etc/apache2/sites-available/name.blog.conf`:
 
 ```apache
 <VirtualHost *:80>
-    ServerName nom.blog
-    ServerAlias www.nom.blog
+    ServerName name.blog
+    ServerAlias www.name.blog
     DocumentRoot /var/www/html/wordpress
     <Directory /var/www/html/wordpress>
         AllowOverride All
@@ -644,31 +644,31 @@ Créer `/etc/apache2/sites-available/nom.blog.conf` :
 ```
 
 ```bash
-sudo a2ensite nom.blog.conf
+sudo a2ensite name.blog.conf
 sudo a2enmod rewrite
 sudo systemctl reload apache2
 ```
 
-> 📸 **Capture 19** — Site `nom.blog` activé, Apache rechargé  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 19** — `name.blog` site enabled, Apache reloaded
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 5.3 Configuration WordPress
+### 5.3 WordPress configuration
 
-Ouvrir `http://nom.blog` dans le navigateur et suivre l'assistant d'installation WordPress (nom de la base, utilisateur, mot de passe).
+Open `http://name.blog` in the browser and follow the WordPress installation wizard (database name, username, password).
 
-> 📸 **Capture 20** — Page d'installation WordPress dans le navigateur  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 20** — WordPress installation page in the browser
+> `[ Insert your screenshot here ]`
 
-> 📸 **Capture 21** — WordPress installé, dashboard accessible  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 21** — WordPress installed, dashboard accessible
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Étape 6 — Déploiement Drupal (prenom.site)
+## Step 6 — Drupal Deployment (firstname.site)
 
-### 6.1 Téléchargement et extraction
+### 6.1 Download and extract
 
 ```bash
 cd /var/www/html
@@ -678,19 +678,19 @@ sudo chown -R www-data:www-data drupal/
 sudo chmod -R 755 drupal/
 ```
 
-> 📸 **Capture 22** — Drupal extrait dans `/var/www/html/drupal`  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 22** — Drupal extracted to `/var/www/html/drupal`
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 6.2 Virtual Host Apache pour prenom.site
+### 6.2 Apache Virtual Host for firstname.site
 
-Créer `/etc/apache2/sites-available/prenom.site.conf` :
+Create `/etc/apache2/sites-available/firstname.site.conf`:
 
 ```apache
 <VirtualHost *:80>
-    ServerName prenom.site
-    ServerAlias www.prenom.site
+    ServerName firstname.site
+    ServerAlias www.firstname.site
     DocumentRoot /var/www/html/drupal
     <Directory /var/www/html/drupal>
         AllowOverride All
@@ -700,72 +700,72 @@ Créer `/etc/apache2/sites-available/prenom.site.conf` :
 ```
 
 ```bash
-sudo a2ensite prenom.site.conf
+sudo a2ensite firstname.site.conf
 sudo systemctl reload apache2
 ```
 
-> 📸 **Capture 23** — Site `prenom.site` activé, Apache rechargé  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 23** — `firstname.site` enabled, Apache reloaded
+> `[ Insert your screenshot here ]`
 
 ---
 
-### 6.3 Installation de Drupal
+### 6.3 Drupal installation
 
-Ouvrir `http://prenom.site` dans le navigateur et suivre l'assistant d'installation Drupal.
+Open `http://firstname.site` in the browser and follow the Drupal installation wizard.
 
-> 📸 **Capture 24** — Page d'installation Drupal dans le navigateur  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 24** — Drupal installation page in the browser
+> `[ Insert your screenshot here ]`
 
-> 📸 **Capture 25** — Drupal installé, accueil du site accessible  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 25** — Drupal installed, site home page accessible
+> `[ Insert your screenshot here ]`
 
 ---
 
-## Vérification finale
+## Final Verification
 
-### Récapitulatif des services
+### Services summary
 
-| Service | Paquet        | Port | Rôle                            |
-|---------|---------------|------|---------------------------------|
-| DNS     | bind9         | 53   | Résolution noms de domaine      |
-| Web     | apache2       | 80   | Hébergement WordPress / Drupal  |
-| DB      | mysql-server  | 3306 | Base de données                 |
-| PHP     | php           | —    | Traitement côté serveur         |
-| FTP     | vsftpd        | 21   | Transfert de fichiers           |
+| Service | Package       | Port | Role                             |
+|---------|---------------|------|----------------------------------|
+| DNS     | bind9         | 53   | Domain name resolution           |
+| Web     | apache2       | 80   | WordPress / Drupal hosting       |
+| DB      | mysql-server  | 3306 | Database                         |
+| PHP     | php           | —    | Server-side processing           |
+| FTP     | vsftpd        | 21   | File transfer                    |
 
-### Test final de tous les services
+### Final test of all services
 
 ```bash
 sudo systemctl status bind9 apache2 mysql vsftpd
-curl http://nom.blog
-curl http://prenom.site
+curl http://name.blog
+curl http://firstname.site
 ```
 
-> 📸 **Capture 26** — Tous les services actifs (bind9, apache2, mysql, vsftpd)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 26** — All services active (bind9, apache2, mysql, vsftpd)
+> `[ Insert your screenshot here ]`
 
-> 📸 **Capture 27** — `nom.blog` accessible dans le navigateur (WordPress)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 27** — `name.blog` accessible in the browser (WordPress)
+> `[ Insert your screenshot here ]`
 
-> 📸 **Capture 28** — `prenom.site` accessible dans le navigateur (Drupal)  
-> `[ Insérez votre capture d'écran ici ]`
+> 📸 **Screenshot 28** — `firstname.site` accessible in the browser (Drupal)
+> `[ Insert your screenshot here ]`
 
 ---
 
 ## Conclusion
 
-Ce projet a permis de mettre en place une infrastructure complète réseau et hébergement web sur Linux. Les compétences acquises comprennent :
+This project enabled the deployment of a complete network and web hosting infrastructure on Linux. The skills acquired include:
 
-**Infrastructure réseau (Partie 0) :**
-- Identification des machines avec `hostnamectl`
-- Configuration réseau moderne avec `systemd-networkd`
-- Routage inter-VLAN et NAT avec `nftables`
+**Network infrastructure (Part 0):**
+- Machine identification with `hostnamectl`
+- Modern network configuration with `systemd-networkd`
+- Inter-VLAN routing and NAT with `nftables`
 
-**Services web (Partie 1) :**
-- Configuration d'un serveur DNS avec BIND9 (zones directe et inverse)
-- Installation et configuration de la pile LAMP (Apache, MySQL, PHP)
-- Déploiement de sites WordPress et Drupal avec Virtual Hosts Apache
-- Configuration du service FTP avec vsftpd pour le transfert de fichiers
-- Utilisation de FileZilla depuis Windows pour interagir avec le serveur Linux
+**Web services (Part 1):**
+- DNS server configuration with BIND9 (forward and reverse zones)
+- Installation and configuration of the LAMP stack (Apache, MySQL, PHP)
+- Deployment of WordPress and Drupal sites with Apache Virtual Hosts
+- FTP service configuration with vsftpd for file transfer
+- Use of FileZilla from Windows to interact with the Linux server
 
-> ⚠️ Toutes les captures d'écran (Preuves N°1 à 5 + Captures 1 à 28) doivent être insérées aux emplacements prévus avant la remise du rapport.
+> ⚠️ All screenshots (Proofs #1 to 5 + Screenshots 1 to 28) must be inserted at the designated locations before submitting the report.
