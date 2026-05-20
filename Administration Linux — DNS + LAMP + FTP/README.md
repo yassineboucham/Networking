@@ -150,6 +150,29 @@ mv /etc/network/interfaces /etc/network/interfaces.backup
 systemctl enable systemd-networkd
 systemctl start systemd-networkd
 ```
+-> You can check if systemd-networkd is being used with these commands:
+```
+    systemctl status systemd-networkd
+```
+- If it is active, you will see something like:
+* Active: active (running)
+
+-> You can also verify which service manages your interfaces:
+```
+    networkctl
+```
+- If systemd-networkd is managing the network, it will list your interfaces with states like:
+* IDX LINK  TYPE     OPERATIONAL    SETUP
+  2 ens33   ether    routable       configured
+
+-> Another useful check:
+```
+    systemctl is-enabled systemd-networkd
+```
+- Results:
+* enabled → starts automatically at boot
+* disabled → not enabled
+* masked → blocked from starting
 
 ### Configuration du routeur srv-linux
 
