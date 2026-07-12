@@ -1,9 +1,10 @@
-# Import-Users.ps1
+# Import-Users.ps1 (corrected)
 $csvPath = "C:\Scripts\employes.csv"
 $domain  = "ex-<prenom>.final"
 $defaultPassword = ConvertTo-SecureString "P@ssw0rd2026" -AsPlainText -Force
 
-$employes = Import-Csv -Path $csvPath
+# IMPORTANT: force UTF8 so accented characters (é, è, ç, etc.) aren't corrupted
+$employes = Import-Csv -Path $csvPath -Encoding UTF8
 
 foreach ($emp in $employes) {
 
@@ -13,27 +14,31 @@ foreach ($emp in $employes) {
     $ouPath    = "OU=Utilisateurs,OU=$service,DC=ex-<prenom>,DC=final"
     $groupName = "G_$service"
 
-    # Q3.4 - éviter les doublons si le script est relancé
     if (Get-ADUser -Filter "SamAccountName -eq '$login'" -ErrorAction SilentlyContinue) {
         Write-Host "Utilisateur $login existe deja - ignore" -ForegroundColor Yellow
         continue
     }
 
-    New-ADUser `
-        -Name "$($emp.Prenom) $($emp.Nom)" `
-        -GivenName $emp.Prenom `
-        -Surname $emp.Nom `
-        -SamAccountName $login `
-        -UserPrincipalName $upn `
-        -Path $ouPath `
-        -Description $emp.Fonction `
-        -OfficePhone $emp.Telephone `
-        -AccountPassword $defaultPassword `
-        -ChangePasswordAtLogon $true `
-        -Enabled $true
+    try {
+        New-ADUser `
+            -Name "$($emp.Prenom) $($emp.Nom)" `
+            -GivenName $emp.Prenom `
+            -Surname $emp.Nom `
+            -SamAccountName $login `
+            -UserPrincipalName $upn `
+            -Path $ouPath `
+            -Description $emp.Fonction `
+            -OfficePhone $emp.Telephone `
+            -AccountPassword $defaultPassword `
+            -ChangePasswordAtLogon $true `
+            -Enabled $true `
+            -ErrorAction Stop
 
-    # Ajout au groupe global du service (strategie AGDLP)
-    Add-ADGroupMember -Identity $groupName -Members $login
+        Add-ADGroupMember -Identity $groupName -Members $login -ErrorAction Stop
 
-    Write-Host "Utilisateur cree : $upn -> groupe $groupName" -ForegroundColor Green
+        Write-Host "Utilisateur cree : $upn -> groupe $groupName" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "ECHEC pour $($emp.Prenom) $($emp.Nom) : $($_.Exception.Message)" -ForegroundColor Red
+    }
 }
