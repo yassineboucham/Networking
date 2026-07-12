@@ -246,6 +246,7 @@ La colonne **`Service`** — elle sert à construire dynamiquement le chemin `$o
 **Q3.4 — Exécution du script deux fois :**
 Sans protection, `New-ADUser` échouerait avec une erreur (le `SamAccountName` existe déjà) ou, pire, créerait un doublon avec un nom légèrement différent. Le script ci-dessus l'évite via un test `Get-ADUser -Filter "SamAccountName -eq '$login'"` avant création : si l'utilisateur existe déjà, il est simplement ignoré (`continue`).
 
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ---
 
 ## PARTIE 4 — Profils itinérants et dossiers de base (3 pts)
