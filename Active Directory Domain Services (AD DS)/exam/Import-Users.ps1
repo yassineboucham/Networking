@@ -1,9 +1,7 @@
-# Import-Users.ps1 (corrected)
 $csvPath = "C:\Scripts\employes.csv"
-$domain  = "ex-<prenom>.final"
+$domain  = "ex-boucham.final"
 $defaultPassword = ConvertTo-SecureString "P@ssw0rd2026" -AsPlainText -Force
 
-# IMPORTANT: force UTF8 so accented characters (é, è, ç, etc.) aren't corrupted
 $employes = Import-Csv -Path $csvPath -Encoding UTF8
 
 foreach ($emp in $employes) {
@@ -11,7 +9,7 @@ foreach ($emp in $employes) {
     $service   = $emp.Service
     $login     = ("$($emp.Prenom).$($emp.Nom)").ToLower() -replace " ", ""
     $upn       = "$login@$domain"
-    $ouPath    = "OU=Utilisateurs,OU=$service,DC=ex-<prenom>,DC=final"
+    $ouPath    = "OU=Utilisateurs,OU=$service,DC=ex-boucham,DC=final"
     $groupName = "G_$service"
 
     if (Get-ADUser -Filter "SamAccountName -eq '$login'" -ErrorAction SilentlyContinue) {
