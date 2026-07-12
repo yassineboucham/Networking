@@ -230,7 +230,9 @@ Exécutez-le :
 cd C:\Scripts
 .\Import-Users.ps1
 ```
-
+```
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
 📸 **CAPTURE 9** : `dsa.msc`, montrez les 50 utilisateurs répartis dans leurs OUs respectives.
 📸 **CAPTURE 10** : le script ouvert dans **PowerShell ISE**, code visible.
 📸 **CAPTURE 11** : sur `RH01<prenom>`, connectez-vous avec un compte RH créé (ex. `fatima.zahra`), montrez l'écran de changement de mot de passe obligatoire puis la session ouverte.
@@ -246,7 +248,6 @@ La colonne **`Service`** — elle sert à construire dynamiquement le chemin `$o
 **Q3.4 — Exécution du script deux fois :**
 Sans protection, `New-ADUser` échouerait avec une erreur (le `SamAccountName` existe déjà) ou, pire, créerait un doublon avec un nom légèrement différent. Le script ci-dessus l'évite via un test `Get-ADUser -Filter "SamAccountName -eq '$login'"` avant création : si l'utilisateur existe déjà, il est simplement ignoré (`continue`).
 
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ---
 
 ## PARTIE 4 — Profils itinérants et dossiers de base (3 pts)
