@@ -231,7 +231,7 @@ cd C:\Scripts
 .\Import-Users.ps1
 ```
 ```
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+Set-ExecutionPolicy -Scope Process Bypass
 ```
 📸 **CAPTURE 9** : `dsa.msc`, montrez les 50 utilisateurs répartis dans leurs OUs respectives.
 📸 **CAPTURE 10** : le script ouvert dans **PowerShell ISE**, code visible.
